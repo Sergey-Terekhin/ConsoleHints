@@ -30,3 +30,5 @@ Following hot keys are supported out-of-box:
 * `Down arrow` select next command from history if user's input is empty or select next hint (if possible)
 
 Modify internal `switch` in the `ReadHintedLine` function to add processing of other keys
+
+![Demo](https://github.com/Sergey-Terekhin/ConsoleHints/blob/master/demo.gif)

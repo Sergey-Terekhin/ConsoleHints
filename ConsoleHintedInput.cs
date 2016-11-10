@@ -180,10 +180,8 @@ namespace ConsoleHints
                         WriteSuggestion(suggestion, hintColor);
                     }
                 }
-                if (moveCursor)
-                {
-                    Console.CursorLeft = cursorPosition;
-                }
+                
+                Console.CursorLeft = cursorPosition;
             }
             ClearCurrentConsoleLine();
             Console.WriteLine(readLine);

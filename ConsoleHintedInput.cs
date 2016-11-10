@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace AS.Concept_vSdk.Cli
+namespace ConsoleHintedInput
 {
     public class ConsoleHintedInput
     {

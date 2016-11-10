@@ -41,32 +41,64 @@ namespace ConsoleHints
             Suggestion suggestion = null;
             var userInput = string.Empty;
             var readLine = string.Empty;
-
+            var wasUserInput = false;
+            var moveCursor = false;
+            var cursorPosition = Console.CursorLeft;
             while (ConsoleKey.Enter != (input = Console.ReadKey()).Key)
             {
+                int positionToDelete;
                 switch (input.Key)
                 {
+                    case ConsoleKey.Delete:
+                        positionToDelete = cursorPosition - ConsoleUtils.Prompt.Length;
+                        if (positionToDelete >= 0 && positionToDelete < userInput.Length)
+                        {
+                            userInput = userInput.Any() ? userInput.Remove(positionToDelete, 1) : string.Empty;
+                        }
+                        wasUserInput = !string.IsNullOrWhiteSpace(userInput);
+                        UpdateSuggestionsForUserInput(userInput);
+                        suggestion = GetFirstSuggestion();
+                        break;
                     case ConsoleKey.Backspace:
-                        userInput = userInput.Any() ? userInput.Remove(userInput.Length - 1, 1) : string.Empty;
+                        positionToDelete = cursorPosition - ConsoleUtils.Prompt.Length - 1;
+                        if (positionToDelete >= 0 && positionToDelete < userInput.Length)
+                        {
+                            userInput = userInput.Any() ? userInput.Remove(positionToDelete, 1) : string.Empty;
+                            cursorPosition--;
+                        }
+                        if (cursorPosition < ConsoleUtils.Prompt.Length)
+                        {
+                            cursorPosition = ConsoleUtils.Prompt.Length;
+                        }
+                        wasUserInput = !string.IsNullOrWhiteSpace(userInput);
+                        UpdateSuggestionsForUserInput(userInput);
+                        suggestion = GetFirstSuggestion();
                         break;
                     case ConsoleKey.Tab:
                         if (suggestion != null)
                         {
                             userInput = suggestion.Value + ' ';
+                            UpdateSuggestionsForUserInput(userInput);
+                            suggestion = GetFirstSuggestion();
+                            cursorPosition = Console.CursorLeft;
                         }
                         break;
                     case ConsoleKey.Spacebar:
                         if (suggestion != null)
+                        {
                             userInput = suggestion.Value + ' ';
+                        }
                         else if (Regex.IsMatch(input.KeyChar.ToString(), inputRegex))
                         {
-                            userInput += input.KeyChar;
+                            wasUserInput = true;
+                            cursorPosition++;
+                            userInput = userInput.Insert(cursorPosition - ConsoleUtils.Prompt.Length - 1, input.KeyChar.ToString());
                             UpdateSuggestionsForUserInput(userInput);
                             suggestion = GetFirstSuggestion();
                         }
                         break;
                     case ConsoleKey.UpArrow:
-                        if (string.IsNullOrWhiteSpace(userInput))
+                        if (!wasUserInput)
                         {
                             userInput = GetPreviousCommandFromHistory();
                         }
@@ -76,7 +108,7 @@ namespace ConsoleHints
                         }
                         break;
                     case ConsoleKey.DownArrow:
-                        if (string.IsNullOrWhiteSpace(userInput))
+                        if (!wasUserInput)
                         {
                             userInput = GetNextCommandFromHistory();
                         }
@@ -86,30 +118,71 @@ namespace ConsoleHints
                         }
                         break;
                     case ConsoleKey.LeftArrow:
+                        if (cursorPosition > ConsoleUtils.Prompt.Length)
+                        {
+                            moveCursor = true;
+                            cursorPosition--;
+                        }
+                        break;
                     case ConsoleKey.RightArrow:
+                        if (cursorPosition < userInput.Length + ConsoleUtils.Prompt.Length)
+                        {
+                            moveCursor = true;
+                            cursorPosition++;
+                        }
+                        break;
+                    case ConsoleKey.Home:
+                        moveCursor = true;
+                        cursorPosition = ConsoleUtils.Prompt.Length;
+                        break;
+                    case ConsoleKey.End:
+                        moveCursor = true;
+                        cursorPosition = userInput.Length + ConsoleUtils.Prompt.Length;
+                        break;
+                    case ConsoleKey.F1:
+                    case ConsoleKey.F2:
+                    case ConsoleKey.F3:
+                    case ConsoleKey.F4:
+                    case ConsoleKey.F5:
+                    case ConsoleKey.F6:
+                    case ConsoleKey.F7:
+                    case ConsoleKey.F8:
+                    case ConsoleKey.F9:
+                    case ConsoleKey.F10:
+                    case ConsoleKey.F11:
+                    case ConsoleKey.F12:
                         break;
                     default:
                         if (Regex.IsMatch(input.KeyChar.ToString(), inputRegex))
                         {
-                            userInput += input.KeyChar;
+                            cursorPosition++;
+                            userInput = userInput.Insert(cursorPosition - ConsoleUtils.Prompt.Length - 1, input.KeyChar.ToString());
+                            //userInput += input.KeyChar;
                         }
+                        wasUserInput = true;
                         UpdateSuggestionsForUserInput(userInput);
                         suggestion = GetFirstSuggestion();
                         break;
                 }
 
 
-                readLine = suggestion != null ? suggestion.Value : userInput;
+                readLine = suggestion != null ? suggestion.Value : userInput.TrimEnd(' ');
 
                 ClearCurrentConsoleLine();
 
                 Console.Write(userInput);
+
+
                 if (userInput.Any())
                 {
                     if (suggestion != null && suggestion.Value != userInput)
                     {
                         WriteSuggestion(suggestion, hintColor);
                     }
+                }
+                if (moveCursor)
+                {
+                    Console.CursorLeft = cursorPosition;
                 }
             }
             ClearCurrentConsoleLine();

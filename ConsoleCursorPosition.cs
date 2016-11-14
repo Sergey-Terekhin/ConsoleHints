@@ -1,4 +1,4 @@
-﻿namespace AS.Concept_vSdk.Cli
+﻿namespace ConsoleHints
 {
     internal class ConsoleCursorPosition
     {

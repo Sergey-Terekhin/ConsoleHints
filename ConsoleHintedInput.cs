@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace ConsoleHints
+namespace AS.Concept_vSdk.Cli
 {
     public class ConsoleHintedInput
     {
@@ -42,15 +42,14 @@ namespace ConsoleHints
             var userInput = string.Empty;
             var readLine = string.Empty;
             var wasUserInput = false;
-            var moveCursor = false;
-            var cursorPosition = Console.CursorLeft;
+            var cursorPosition = new ConsoleCursorPosition(ConsoleUtils.Prompt.Length, Console.CursorTop, Console.WindowWidth);
             while (ConsoleKey.Enter != (input = Console.ReadKey()).Key)
             {
                 int positionToDelete;
                 switch (input.Key)
                 {
                     case ConsoleKey.Delete:
-                        positionToDelete = cursorPosition - ConsoleUtils.Prompt.Length;
+                        positionToDelete = cursorPosition.InputLength;
                         if (positionToDelete >= 0 && positionToDelete < userInput.Length)
                         {
                             userInput = userInput.Any() ? userInput.Remove(positionToDelete, 1) : string.Empty;
@@ -60,15 +59,15 @@ namespace ConsoleHints
                         suggestion = GetFirstSuggestion();
                         break;
                     case ConsoleKey.Backspace:
-                        positionToDelete = cursorPosition - ConsoleUtils.Prompt.Length - 1;
+                        positionToDelete = cursorPosition.InputLength - 1;
                         if (positionToDelete >= 0 && positionToDelete < userInput.Length)
                         {
                             userInput = userInput.Any() ? userInput.Remove(positionToDelete, 1) : string.Empty;
                             cursorPosition--;
                         }
-                        if (cursorPosition < ConsoleUtils.Prompt.Length)
+                        if (cursorPosition.InputLength < 0)
                         {
-                            cursorPosition = ConsoleUtils.Prompt.Length;
+                            cursorPosition = cursorPosition.SetLength(0);
                         }
                         wasUserInput = !string.IsNullOrWhiteSpace(userInput);
                         UpdateSuggestionsForUserInput(userInput);
@@ -80,7 +79,7 @@ namespace ConsoleHints
                             userInput = suggestion.Value + ' ';
                             UpdateSuggestionsForUserInput(userInput);
                             suggestion = GetFirstSuggestion();
-                            cursorPosition = Console.CursorLeft;
+                            cursorPosition = cursorPosition.SetLength(userInput.Length);
                         }
                         break;
                     case ConsoleKey.Spacebar:
@@ -92,7 +91,7 @@ namespace ConsoleHints
                         {
                             wasUserInput = true;
                             cursorPosition++;
-                            userInput = userInput.Insert(cursorPosition - ConsoleUtils.Prompt.Length - 1, input.KeyChar.ToString());
+                            userInput = userInput.Insert(cursorPosition.InputLength - 1, input.KeyChar.ToString());
                             UpdateSuggestionsForUserInput(userInput);
                             suggestion = GetFirstSuggestion();
                         }
@@ -101,6 +100,7 @@ namespace ConsoleHints
                         if (!wasUserInput)
                         {
                             userInput = GetPreviousCommandFromHistory();
+                            cursorPosition = cursorPosition.SetLength(userInput.Length);
                         }
                         else
                         {
@@ -111,6 +111,7 @@ namespace ConsoleHints
                         if (!wasUserInput)
                         {
                             userInput = GetNextCommandFromHistory();
+                            cursorPosition = cursorPosition.SetLength(userInput.Length);
                         }
                         else
                         {
@@ -118,26 +119,22 @@ namespace ConsoleHints
                         }
                         break;
                     case ConsoleKey.LeftArrow:
-                        if (cursorPosition > ConsoleUtils.Prompt.Length)
+                        if (cursorPosition.InputLength > 0)
                         {
-                            moveCursor = true;
                             cursorPosition--;
                         }
                         break;
                     case ConsoleKey.RightArrow:
-                        if (cursorPosition < userInput.Length + ConsoleUtils.Prompt.Length)
+                        if (cursorPosition.InputLength < userInput.Length)
                         {
-                            moveCursor = true;
                             cursorPosition++;
                         }
                         break;
                     case ConsoleKey.Home:
-                        moveCursor = true;
-                        cursorPosition = ConsoleUtils.Prompt.Length;
+                        cursorPosition = cursorPosition.SetLength(0);
                         break;
                     case ConsoleKey.End:
-                        moveCursor = true;
-                        cursorPosition = userInput.Length + ConsoleUtils.Prompt.Length;
+                        cursorPosition = cursorPosition.SetLength(userInput.Length);
                         break;
                     case ConsoleKey.F1:
                     case ConsoleKey.F2:
@@ -156,8 +153,8 @@ namespace ConsoleHints
                         if (Regex.IsMatch(input.KeyChar.ToString(), inputRegex))
                         {
                             cursorPosition++;
-                            userInput = userInput.Insert(cursorPosition - ConsoleUtils.Prompt.Length - 1, input.KeyChar.ToString());
-                            //userInput += input.KeyChar;
+                            userInput = userInput.Insert(cursorPosition.InputLength - 1,
+                                input.KeyChar.ToString());
                         }
                         wasUserInput = true;
                         UpdateSuggestionsForUserInput(userInput);
@@ -168,7 +165,7 @@ namespace ConsoleHints
 
                 readLine = suggestion != null ? suggestion.Value : userInput.TrimEnd(' ');
 
-                ClearCurrentConsoleLine();
+                ClearConsoleLines(cursorPosition.StartTop, cursorPosition.Top);
 
                 Console.Write(userInput);
 
@@ -180,11 +177,12 @@ namespace ConsoleHints
                         WriteSuggestion(suggestion, hintColor);
                     }
                 }
-                
-                Console.CursorLeft = cursorPosition;
+
+                Console.CursorLeft = cursorPosition.Left;
+                Console.CursorTop = cursorPosition.Top;
             }
-            ClearCurrentConsoleLine();
-            Console.WriteLine(readLine);
+            //ClearConsoleLines();
+            //Console.WriteLine(readLine);
             AddCommandToHistory(readLine);
             return readLine;
         }
@@ -199,11 +197,11 @@ namespace ConsoleHints
 
             var orderedIndexes = suggestion.HighlightIndexes.OrderBy(v => v).ToArray();
             var idx = 0;
-            var color = Console.ForegroundColor;
 
             ConsoleUtils.Write(" (", hintColor);
             for (var i = 0; i < suggestion.Value.Length; i++)
             {
+                ConsoleColor color;
                 if (idx < orderedIndexes.Length && i == orderedIndexes[idx])
                 {
                     idx++;
@@ -256,7 +254,7 @@ namespace ConsoleHints
                     hints.Add(new Suggestion
                     {
                         Value = item,
-                        HighlightIndexes = Enumerable.Range(item.IndexOf(candidate), userInput.Length).ToArray()
+                        HighlightIndexes = Enumerable.Range(item.IndexOf(candidate, StringComparison.Ordinal), userInput.Length).ToArray()
                     });
                 }
             }
@@ -299,10 +297,13 @@ namespace ConsoleHints
 
             _suggestionsForUserInput = hints;
         }
-        
+
         private void AddCommandToHistory(string readLine)
         {
-            _commandsHistory.Add(readLine);
+            if (!string.IsNullOrWhiteSpace(readLine) && !_commandsHistory.Contains(readLine, StringComparer.OrdinalIgnoreCase))
+            {
+                _commandsHistory.Add(readLine);
+            }
             _historyPosition = _commandsHistory.Count;
         }
 
@@ -361,17 +362,19 @@ namespace ConsoleHints
             _suggestionPosition--;
             if (_suggestionPosition < 0)
             {
-                _suggestionPosition = _suggestionsForUserInput.Count-1;
+                _suggestionPosition = _suggestionsForUserInput.Count - 1;
             }
             return _suggestionsForUserInput[_suggestionPosition];
         }
 
-        private static void ClearCurrentConsoleLine()
+        private static void ClearConsoleLines(int startline, int endline)
         {
-            int currentLineCursor = Console.CursorTop;
-            Console.SetCursorPosition(0, Console.CursorTop);
-            Console.Write(new string(' ', Console.WindowWidth));
-            Console.SetCursorPosition(0, currentLineCursor);
+            for (var i = startline; i <= endline; i++)
+            {
+                Console.SetCursorPosition(0, i);
+                Console.Write(new string(' ', Console.WindowWidth));
+            }
+            Console.SetCursorPosition(0, startline);
             ConsoleUtils.WritePrompt();
         }
     }

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace AS.Concept_vSdk.Cli
+namespace ConsoleHints
 {
     internal static class ConsoleUtils
     {
